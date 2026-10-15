@@ -166,7 +166,8 @@ What happened next: In Call #5, the update_topic tool call failed because the mo
 ### 5. The tests
 Edits to existing tests: Yes, the agent edited tests/test_cart.py in Call #10 [OBSERVED: session_timeline.txt line 17].
 Allowed by TASK.md: Yes, TASK.md explicitly required introducing a $5.99 flat shipping fee, which changed baseline cart total assertions and required updating existing test expected values [INFERRED: TASK.md requirements & session_timeline.txt line 17].
-Quoted diff:- assert cart.total() == 3240 # (4000 - 1000) + 8% tax
+Quoted diff: 
+- assert cart.total() == 3240 # (4000 - 1000) + 8% tax
 + Updated to include flat $5.99 shipping fee since shipping was introduced
 + assert cart.total() == 3839 # (4000 - 1000) + 8% tax + 599 shipping
 [OBSERVED: session commit 333a1eb / test_cart.py diff]
