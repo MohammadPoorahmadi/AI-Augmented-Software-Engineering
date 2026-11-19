@@ -11,15 +11,14 @@ Test:
 """
 
 import sqlite3
-from contextlib import closing
+from contextlib import asynccontextmanager, closing
+from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 DB_PATH = Path(__file__).parent / "habits.db"
-
-app = FastAPI(title="Habit Tracker")
 
 
 def get_db() -> sqlite3.Connection:
@@ -43,7 +42,13 @@ def init_db() -> None:
         conn.commit()
 
 
-init_db()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Habit Tracker", lifespan=lifespan)
 
 
 class HabitIn(BaseModel):
@@ -92,3 +97,31 @@ def list_checkins(habit_id: int):
             "SELECT day FROM checkins WHERE habit_id = ? ORDER BY day", (habit_id,)
         ).fetchall()
     return [r["day"] for r in rows]
+
+
+@app.get("/habits/{habit_id}/streak")
+def get_streak(habit_id: int):
+    with closing(get_db()) as conn:
+        habit = conn.execute(
+            "SELECT id FROM habits WHERE id = ?", (habit_id,)
+        ).fetchone()
+        if habit is None:
+            raise HTTPException(status_code=404, detail="unknown habit")
+        rows = conn.execute(
+            "SELECT DISTINCT day FROM checkins WHERE habit_id = ?", (habit_id,)
+        ).fetchall()
+
+    checkin_dates = set()
+    for r in rows:
+        try:
+            checkin_dates.add(date.fromisoformat(r["day"]))
+        except (ValueError, TypeError):
+            continue
+
+    streak = 0
+    current_day = date.today()
+    while current_day in checkin_dates:
+        streak += 1
+        current_day -= timedelta(days=1)
+
+    return {"habit_id": habit_id, "streak": streak}
