@@ -1,9 +1,17 @@
 import pytest
 from fastapi.testclient import TestClient
 
+import main
 from main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def setup_test_db(tmp_path, monkeypatch):
+    test_db = tmp_path / "test_habits.db"
+    monkeypatch.setattr(main, "DB_PATH", test_db)
+    main.init_db()
 
 
 def test_create_and_list_habit():
@@ -19,6 +27,17 @@ def test_create_habit_valid():
     r = client.post("/habits", json={"name": "Meditate"})
     assert r.status_code == 200
     assert r.json()["name"] == "Meditate"
+
+
+def test_create_habit_strips_whitespace():
+    r = client.post("/habits", json={"name": "  Drink water  "})
+    assert r.status_code == 200
+    assert r.json()["name"] == "Drink water"
+    hid = r.json()["id"]
+    r2 = client.get("/habits")
+    assert r2.status_code == 200
+    habit = next(h for h in r2.json() if h["id"] == hid)
+    assert habit["name"] == "Drink water"
 
 
 @pytest.mark.parametrize("invalid_name", ["", "   ", "\t", "\n", " \t \n "])
