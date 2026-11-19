@@ -8,12 +8,25 @@ from main import app
 
 client = TestClient(app)
 
+FIXED_TODAY = date(2026, 9, 22)
+
+
+class MockDate(date):
+    @classmethod
+    def today(cls):
+        return FIXED_TODAY
+
 
 @pytest.fixture(autouse=True)
 def setup_test_db(tmp_path, monkeypatch):
     test_db = tmp_path / "test_habits.db"
     monkeypatch.setattr(main, "DB_PATH", test_db)
     main.init_db()
+
+
+@pytest.fixture(autouse=True)
+def freeze_today(monkeypatch):
+    monkeypatch.setattr(main, "date", MockDate)
 
 
 def test_create_and_list_habit():
@@ -40,7 +53,7 @@ def test_checkin_unknown_habit_404():
 
 def test_streak_active_multiday():
     hid = client.post("/habits", json={"name": "Exercise"}).json()["id"]
-    today = date.today()
+    today = FIXED_TODAY
     for offset in (2, 1, 0):
         day = (today - timedelta(days=offset)).isoformat()
         r = client.post(f"/habits/{hid}/checkin", json={"day": day})
@@ -53,7 +66,7 @@ def test_streak_active_multiday():
 
 def test_streak_broken():
     hid = client.post("/habits", json={"name": "Meditation"}).json()["id"]
-    today = date.today()
+    today = FIXED_TODAY
     for offset in (2, 1):
         day = (today - timedelta(days=offset)).isoformat()
         r = client.post(f"/habits/{hid}/checkin", json={"day": day})
@@ -79,7 +92,7 @@ def test_streak_unknown_habit_404():
 
 def test_streak_gap_before_active():
     hid = client.post("/habits", json={"name": "Coding"}).json()["id"]
-    today = date.today()
+    today = FIXED_TODAY
     for offset in (4, 1, 0):
         day = (today - timedelta(days=offset)).isoformat()
         r = client.post(f"/habits/{hid}/checkin", json={"day": day})
@@ -92,7 +105,7 @@ def test_streak_gap_before_active():
 
 def test_streak_duplicate_checkins_same_day():
     hid = client.post("/habits", json={"name": "Running"}).json()["id"]
-    today = date.today()
+    today = FIXED_TODAY
     for offset in (1, 0):
         day = (today - timedelta(days=offset)).isoformat()
         r1 = client.post(f"/habits/{hid}/checkin", json={"day": day})
@@ -107,7 +120,7 @@ def test_streak_duplicate_checkins_same_day():
 
 def test_streak_future_checkin_ignored():
     hid = client.post("/habits", json={"name": "Writing"}).json()["id"]
-    today = date.today()
+    today = FIXED_TODAY
     future_day = (today + timedelta(days=1)).isoformat()
     today_day = today.isoformat()
 

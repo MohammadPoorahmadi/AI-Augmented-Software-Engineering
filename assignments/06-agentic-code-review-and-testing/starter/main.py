@@ -11,7 +11,7 @@ Test:
 """
 
 import sqlite3
-from contextlib import closing
+from contextlib import asynccontextmanager, closing
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -19,8 +19,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 DB_PATH = Path(__file__).parent / "habits.db"
-
-app = FastAPI(title="Habit Tracker")
 
 
 def get_db() -> sqlite3.Connection:
@@ -44,7 +42,13 @@ def init_db() -> None:
         conn.commit()
 
 
-init_db()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Habit Tracker", lifespan=lifespan)
 
 
 class HabitIn(BaseModel):
